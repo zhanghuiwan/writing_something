@@ -1,0 +1,14 @@
+path: .
+train: data/train/images
+val: data/valid/images
+test: data/test/images
+
+nc: 1
+names: ['banana']
+
+# roboflow:
+#   workspace: yolo-ccdgk
+#   project: yolo_mc
+#   version: 2
+#   license: CC BY 4.0
+#   url: https://universe.roboflow.com/yolo-ccdgk/yolo_mc/dataset/2
