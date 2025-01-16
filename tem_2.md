@@ -113,3 +113,133 @@ git remote add	新增远程仓库	添加一个新的远程仓库	第一次设置
 
 
 如果你的仓库已经有 origin 地址，但需要切换 URL（如 HTTPS 改为 SSH），使用 git remote set-url 更合适。如果是第一次设置远程仓库，则使用 git remote add。
+
+
+
+
+
+git push --set-upstream origin main 是 Git 中的一个常用命令，用于将本地分支与远程分支关联并推送代码。
+
+
+
+**命令含义分解**
+
+
+
+​	1.	git push
+
+​	•	将本地代码推送到远程仓库。
+
+​	2.	--set-upstream **或** -u
+
+​	•	设置本地分支的上游分支（也就是关联到远程分支）。
+
+​	•	关联后，后续可以直接使用 git push 和 git pull，无需每次都指定远程仓库和分支名称。
+
+​	3.	origin
+
+​	•	远程仓库的名称（通常默认是 origin）。
+
+​	4.	main
+
+​	•	分支名称（通常是主分支的名称）。
+
+
+
+**常见使用场景**
+
+
+
+​	1.	**首次推送新分支**
+
+当本地分支尚未与远程分支建立关联时，使用该命令可以推送代码并完成关联。例如：
+
+
+
+git push --set-upstream origin main
+
+
+
+这会将本地 main 分支推送到远程的 main 分支，并建立关联。
+
+
+
+​	2.	**解决推送分支未设置上游分支的提示**
+
+如果你执行 git push 时收到类似以下错误：
+
+
+
+fatal: The current branch main has no upstream branch.
+
+
+
+则可以用以下命令解决：
+
+
+
+git push --set-upstream origin main
+
+
+
+
+
+​	3.	**便捷操作**
+
+关联后，你可以直接用 git push 和 git pull，Git 会自动推送/拉取与该分支关联的远程分支，而不需要每次指定。
+
+
+
+**运行后的效果**
+
+
+
+​	1.	本地分支 main 与远程分支 origin/main 关联。
+
+​	2.	推送成功后，可以用以下命令检查关联关系：
+
+
+
+git branch -vv
+
+
+
+输出示例：
+
+
+
+\* main 123abc [origin/main] Initial commit
+
+
+
+**后续操作建议**
+
+
+
+​	1.	**推送代码：**
+
+在设置上游分支后，直接使用：
+
+
+
+git push
+
+
+
+
+
+​	2.	**拉取代码：**
+
+如果需要从远程仓库同步代码，使用：
+
+
+
+git pull
+
+
+
+**总结**
+
+
+
+git push --set-upstream origin main 是 Git 中推送新分支并建立本地和远程分支关联的常用命令，能有效减少重复操作，提升工作效率。
