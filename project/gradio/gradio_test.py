@@ -1,26 +1,15 @@
+import numpy as np
 import gradio as gr
-from ultralytics import YOLO
 
+def sepia(input_img):
+    sepia_filter = np.array([
+        [0.393, 0.769, 0.189], 
+        [0.349, 0.686, 0.168], 
+        [0.272, 0.534, 0.131]
+    ])
+    sepia_img = input_img.dot(sepia_filter.T)
+    sepia_img /= sepia_img.max()
+    return sepia_img
 
-model = YOLO('yolov8n.pt')  
-
-def predict(image, iou = 0.5, conf = 0.5):
-    results = model(image, iou = iou, conf = conf)
-    
-    if results:
-        result = results[0]
-        annotated_frame = result.plot()
-        return annotated_frame
-    else:
-        return image  
-
-# 创建Gradio接口
-demo = gr.Interface(
-    fn=predict, 
-    inputs=[gr.Image(), gr.Slider(0, 1, 0.5, 0.1), gr.Slider(0, 1, 0.5, 0.1)], 
-    outputs=gr.Image(),
-)
-
-# 启动Gradio应用
-if __name__ == "__main__":
-    demo.launch(server_name='0.0.0.0', server_port=8080, show_error=True)
+demo = gr.Interface(sepia, gr.Image(), "image")
+demo.launch(server_name='0.0.0.0', server_port=7860, show_error=True)

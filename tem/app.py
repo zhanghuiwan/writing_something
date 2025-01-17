@@ -1,6 +1,6 @@
 import gradio as gr
 import torch
-import spaces
+# import spaces
 from PIL import Image
 import os
 from transformers import CLIPTokenizer, CLIPTextModel, AutoProcessor, T5EncoderModel, T5TokenizerFast
@@ -12,7 +12,6 @@ import math
 import logging
 import sys
 from qwen2_vl.modeling_qwen2_vl import Qwen2VLSimplifiedModel
-from huggingface_hub import snapshot_download
 
 # Set up logging
 logging.basicConfig(
@@ -23,9 +22,9 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 MODEL_ID = "Djrango/Qwen2vl-Flux"
-MODEL_CACHE_DIR = "model_cache"
-local_model_path = 'model_cache'
-DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
+MODEL_CACHE_DIR = "checkpoints"
+LOCAL_MODEL_PATH = "checkpoints"
+DEVICE = "cuda:3" if torch.cuda.is_available() else "cpu"
 DTYPE = torch.bfloat16
 
 # Aspect ratio options
@@ -102,10 +101,9 @@ for model in [text_encoder, text_encoder_two, vae, transformer, qwen2vl, connect
 
 logger.info("All models loaded successfully")
 
-
 # Initialize processors and pipeline
 qwen2vl_processor = AutoProcessor.from_pretrained(
-    local_model_path, 
+    LOCAL_MODEL_PATH, 
     subfolder="qwen2-vl",
     min_pixels=256*28*28,
     max_pixels=256*28*28
@@ -220,71 +218,6 @@ def compute_text_embeddings(prompt=""):
         pooled_prompt_embeds = prompt_embeds.pooler_output
         return pooled_prompt_embeds
 
-@spaces.GPU(duration=75)
-def generate(input_image, prompt="", guidance_scale=3.5, num_inference_steps=28, num_images=2, seed=None, aspect_ratio="1:1", progress=gr.Progress(track_tqdm=True)):
-    try:
-        logger.info(f"Starting generation with prompt: {prompt}")
-        
-        if input_image is None:
-            raise ValueError("No input image provided")
-            
-        if seed is not None:
-            torch.manual_seed(seed)
-            logger.info(f"Set random seed to: {seed}")
-             
-        # Process image with Qwen2VL
-        logger.info("Processing input image with Qwen2VL...")
-        qwen2_hidden_state, image_grid_thw = process_image(input_image)
-        logger.info("Image processing completed")
-        
-        # Compute text embeddings
-        logger.info("Computing text embeddings...")
-        pooled_prompt_embeds = compute_text_embeddings(prompt)
-        t5_prompt_embeds = compute_t5_text_embeddings(prompt)
-        logger.info("Text embeddings computed")
-        
-        # Move Transformer to GPU and process
-        logger.info("Moving Transformer to GPU...")
-        transformer.to(DEVICE)
-        logger.info("Starting Transformer processing...")
-        
-        # Generate image embeddings with Transformer
-        with torch.no_grad():
-            image_embeddings = pipeline.transformer(
-                prompt_embeds=qwen2_hidden_state.to(DEVICE).repeat(num_images, 1, 1),
-                pooled_prompt_embeds=pooled_prompt_embeds,
-                t5_prompt_embeds=t5_prompt_embeds.repeat(num_images, 1, 1) if t5_prompt_embeds is not None else None,
-                num_inference_steps=num_inference_steps,
-                guidance_scale=guidance_scale,
-            )
-        logger.info("Transformer processing completed.")
-        
-        # Move Transformer back to CPU to free GPU memory
-        transformer.cpu()
-        torch.cuda.empty_cache()
-        logger.info("Transformer moved back to CPU.")
-        
-        # Move VAE to GPU and decode
-        logger.info("Moving VAE to GPU...")
-        vae.to(DEVICE)
-        logger.info("Starting VAE decoding...")
-        
-        # Decode image embeddings with VAE
-        output_images = pipeline.vae.decode(image_embeddings.to(DEVICE), height=ASPECT_RATIOS[aspect_ratio][1], width=ASPECT_RATIOS[aspect_ratio][0])
-        logger.info("VAE decoding completed.")
-        
-        # Move VAE back to CPU
-        vae.cpu()
-        torch.cuda.empty_cache()
-        logger.info("VAE moved back to CPU.")
-        
-        return output_images
-            
-    except Exception as e:
-        logger.error(f"Error during generation: {str(e)}")
-        raise gr.Error(f"Generation failed: {str(e)}")
-
-
 # @spaces.GPU(duration=75)
 # def generate(input_image, prompt="", guidance_scale=3.5, num_inference_steps=28, num_images=2, seed=None, aspect_ratio="1:1", progress=gr.Progress(track_tqdm=True)):
 #     try:
@@ -308,41 +241,106 @@ def generate(input_image, prompt="", guidance_scale=3.5, num_inference_steps=28,
 #         t5_prompt_embeds = compute_t5_text_embeddings(prompt)
 #         logger.info("Text embeddings computed")
         
-#         # Move Transformer and VAE to GPU
-#         logger.info("Moving Transformer and VAE to GPU...")
+#         # Move Transformer to GPU and process
+#         logger.info("Moving Transformer to GPU...")
 #         transformer.to(DEVICE)
-#         vae.to(DEVICE)
+#         logger.info("Starting Transformer processing...")
         
-#         # Update pipeline models
-#         pipeline.transformer = transformer
-#         pipeline.vae = vae
-#         logger.info("Models moved to GPU")
-        
-#         # Get dimensions
-#         width, height = ASPECT_RATIOS[aspect_ratio]
-#         logger.info(f"Using dimensions: {width}x{height}")
-        
-#         try:
-#             logger.info("Starting image generation...")
-#             output_images = pipeline(
+#         # Generate image embeddings with Transformer
+#         with torch.no_grad():
+#             image_embeddings = pipeline.transformer(
 #                 prompt_embeds=qwen2_hidden_state.to(DEVICE).repeat(num_images, 1, 1),
 #                 pooled_prompt_embeds=pooled_prompt_embeds,
 #                 t5_prompt_embeds=t5_prompt_embeds.repeat(num_images, 1, 1) if t5_prompt_embeds is not None else None,
 #                 num_inference_steps=num_inference_steps,
 #                 guidance_scale=guidance_scale,
-#                 height=height,
-#                 width=width,
-#             ).images
-#             logger.info("Image generation completed")
-            
-#             return output_images
-            
-#         except Exception as e:
-#             raise RuntimeError(f"Error generating images: {str(e)}")
+#             )
+#         logger.info("Transformer processing completed.")
+        
+#         # Move Transformer back to CPU to free GPU memory
+#         transformer.cpu()
+#         torch.cuda.empty_cache()
+#         logger.info("Transformer moved back to CPU.")
+        
+#         # Move VAE to GPU and decode
+#         logger.info("Moving VAE to GPU...")
+#         vae.to(DEVICE)
+#         logger.info("Starting VAE decoding...")
+        
+#         # Decode image embeddings with VAE
+#         output_images = pipeline.vae.decode(image_embeddings.to(DEVICE), height=ASPECT_RATIOS[aspect_ratio][1], width=ASPECT_RATIOS[aspect_ratio][0])
+#         logger.info("VAE decoding completed.")
+        
+#         # Move VAE back to CPU
+#         vae.cpu()
+#         torch.cuda.empty_cache()
+#         logger.info("VAE moved back to CPU.")
+        
+#         return output_images
             
 #     except Exception as e:
 #         logger.error(f"Error during generation: {str(e)}")
 #         raise gr.Error(f"Generation failed: {str(e)}")
+
+
+# @spaces.GPU(duration=75)
+def generate(input_image, prompt="", guidance_scale=3.5, num_inference_steps=28, num_images=2, seed=None, aspect_ratio="1:1", progress=gr.Progress(track_tqdm=True)):
+    try:
+        logger.info(f"Starting generation with prompt: {prompt}")
+        
+        if input_image is None:
+            raise ValueError("No input image provided")
+            
+        if seed is not None:
+            torch.manual_seed(seed)
+            logger.info(f"Set random seed to: {seed}")
+             
+        # Process image with Qwen2VL
+        logger.info("Processing input image with Qwen2VL...")
+        qwen2_hidden_state, image_grid_thw = process_image(input_image)
+        logger.info("Image processing completed")
+        
+        # Compute text embeddings
+        logger.info("Computing text embeddings...")
+        pooled_prompt_embeds = compute_text_embeddings(prompt)
+        t5_prompt_embeds = compute_t5_text_embeddings(prompt)
+        logger.info("Text embeddings computed")
+        
+        # Move Transformer and VAE to GPU
+        logger.info("Moving Transformer and VAE to GPU...")
+        transformer.to(DEVICE)
+        vae.to(DEVICE)
+        
+        # Update pipeline models
+        pipeline.transformer = transformer
+        pipeline.vae = vae
+        logger.info("Models moved to GPU")
+        
+        # Get dimensions
+        width, height = ASPECT_RATIOS[aspect_ratio]
+        logger.info(f"Using dimensions: {width}x{height}")
+        
+        try:
+            logger.info("Starting image generation...")
+            output_images = pipeline(
+                prompt_embeds=qwen2_hidden_state.to(DEVICE).repeat(num_images, 1, 1),
+                pooled_prompt_embeds=pooled_prompt_embeds,
+                t5_prompt_embeds=t5_prompt_embeds.repeat(num_images, 1, 1) if t5_prompt_embeds is not None else None,
+                num_inference_steps=num_inference_steps,
+                guidance_scale=guidance_scale,
+                height=height,
+                width=width,
+            ).images
+            logger.info("Image generation completed")
+            
+            return output_images
+            
+        except Exception as e:
+            raise RuntimeError(f"Error generating images: {str(e)}")
+            
+    except Exception as e:
+        logger.error(f"Error during generation: {str(e)}")
+        raise gr.Error(f"Generation failed: {str(e)}")
 
 # Create Gradio interface
 with gr.Blocks(
@@ -479,9 +477,8 @@ Generate creative variations of your images with optional text guidance"""
 # Launch the app
 if __name__ == "__main__":
     demo.launch(
-        server_name="127.0.0.1",  # Listen on all network interfaces
-        server_port=7860,       # Use a specific port
-        share=False,            # Disable public URL sharing
-        ssr_mode=False,         # Fixes bug for some users
-        inbrowser=True         
+        server_name="0.0.0.0",  
+        server_port=7860,       
+        share=False,            
+        ssr_mode=False,         
     )
