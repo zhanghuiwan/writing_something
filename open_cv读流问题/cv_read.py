@@ -35,7 +35,7 @@ while True:
 #     if cnt > 5:
 # #break这段代码则报错的6张图片都是相同的，仔细阅读代码，根据cap.read()，分析原因
     
-    import cv2
+import cv2
 import threading
 
 class VideoStreamThread:
